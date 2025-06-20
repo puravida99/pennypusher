@@ -1,0 +1,6 @@
+-e .
+
+mkdocs
+pip
+pytest
+ruff

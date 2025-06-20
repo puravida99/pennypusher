@@ -56,7 +56,7 @@ class StringCleaner(Transform):
             col (str): The column to clean.
             outcol (str): The column to store the cleaned string.
             regex (str): The regex pattern to replace.
-            replacement (str, optional): The replacement string. Defaults to "".
+            replacement (str, optional): The replacement string. Defaults to empty.
         """
         super().__init__()
         self.col = col

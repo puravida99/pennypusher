@@ -1,0 +1,42 @@
+account: "Liabilities:US:Chase:0001"
+glob_pattern: ~/some/directory/data/chase/*.csv
+processed_uri: ~/some/transaction/db
+
+steps:
+    # Read the csv data
+    - step: ParseCsv
+      args:
+        file_path: "{{path}}"
+
+    # Generate a currency column
+    - step: InferCurrency
+      args:
+        amount_col: "amount"
+        outcol: "currency"
+
+    # Remove non-alphanumeric characters from the narrations
+    - step: StringCleaner
+      args:
+        col: "Description"
+        outcol: "narration"
+        regex: "[^a-zA-Z0-9 ]"
+        replacement: ""
+
+    # Convert dates to UTC
+    - step: StandardizeDates
+      args:
+        col: "Transaction Date"
+        outcol: "date"
+        infmt: "%Y-%m-%d"
+        outfmt: "%Y-%m-%dT%H:%M:%S.%fZ"
+
+    # Rename columns
+    - step: RenameCol
+      args:
+        in: "Posting Date"
+        out: "PostingDate"
+    - step: RenameCol
+      args:
+        in: "Posting Date"
+        out: "PostingDate"
+    

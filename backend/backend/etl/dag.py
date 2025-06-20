@@ -2,16 +2,18 @@
 Module for creating a DAG from a configuration file in an effort to obfuscate the raw data source (e.g., bank statements)
 """
 
-import yaml
 from prefect import flow
-from .models import DAGConfig
+from .models import TransformDAGConfig
 from . import transforms
+from ..dags.factory import IDagFactory
+
+class ExtractDagFactory(IDagFactory):
+    def create(self, config_path):
+        pass
 
 class TransformDagFactory:
-    def __init__(self):
-        self.dags = {}
 
-    def create(self, name, config_path):
+    def create(self, config_path):
         """
         TODO: Needs more description
         Creates transform DAG using a configuration file. 
@@ -22,7 +24,7 @@ class TransformDagFactory:
                 source_file: data/bank_chase/txn.csv
 
                 steps:
-                    - step: parse_csv
+                    - step: Parse
                       args:
                         file_path: "{{source_file}}"
 
@@ -55,15 +57,8 @@ class TransformDagFactory:
             The DAG
         
         """
-        if name in self.dags:
-            raise ValueError(f"A DAG named {name} already exists")
 
-        def load_config(config_path):
-            with open(config_path, "r") as f:
-                raw_yaml = yaml.safe_load(f)
-            return DAGConfig(**raw_yaml)
-
-        config = load_config(config_path)
+        config = TransformDAGConfig(IDagFactory.load_config(config_path))
         step_defs = config["steps"]
 
         @flow(name=f"{config_path}_etl_pipeline")
@@ -92,3 +87,15 @@ class TransformDagFactory:
             raise ValueError(f"A DAG named {name} does not exist")
         return self.dags[name]
 
+
+class LoadDagFactory:
+    pass
+
+class EtlDagFactory:
+    
+    def create(self, name, config_path):
+        # Create extract dag
+        # Create transform dag
+        # Create load dag
+
+        pass
