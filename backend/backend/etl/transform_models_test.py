@@ -1,6 +1,6 @@
-
 import yaml
-from . import models
+from . import transform_models
+
 
 def test_load_step_from_yaml():
     yaml_str = """
@@ -12,5 +12,5 @@ def test_load_step_from_yaml():
       replacement: ""
     """
     data = yaml.safe_load(yaml_str)
-    step = models.Step(**data)
+    step = transform_models.TransformStep(**data)
     assert step.step == "StringCleaner"

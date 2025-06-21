@@ -1,18 +1,26 @@
 """ """
 
-from beancount.core.account import is_valid
 import inspect
 import importlib
 from pydantic import BaseModel, create_model, Field, field_validator, ValidationInfo
 from typing import Any, Callable, Dict, get_type_hints, List
 
+
 # Dynamically import your step modules
 modules = {
-    # 'extract': importlib.import_module('.extract', package=__package__),
-    'transform': importlib.import_module('.transform', package=__package__),
+    "transform": importlib.import_module(".transform", package=__package__),
 }
 
-def get_all_step_classes_and_functions():
+
+def get_all_step_classes_and_functions() -> Dict[str, Callable]:
+    """
+    Iterate over the modules and gather all functions and classes (not starting with "_")
+    and their __init__ methods into a dictionary. This is used to map the step names in
+    the DAG config to their function or class.
+
+    Returns:
+        A dictionary where the key is the name of the step and the value is the callable.
+    """
     step_map = {}
     for _, module in modules.items():
         for name, obj in inspect.getmembers(module):
@@ -22,6 +30,7 @@ def get_all_step_classes_and_functions():
                 if inspect.isclass(obj):
                     step_map[name] = obj.__init__
     return step_map
+
 
 def generate_pydantic_model_from_callable(func: Callable) -> BaseModel:
     """
@@ -45,7 +54,7 @@ def generate_pydantic_model_from_callable(func: Callable) -> BaseModel:
         annotation = type_hints.get(name, Any)
         default = param.default if param.default is not inspect.Parameter.empty else ...
         fields[name] = (annotation, Field(default))
-    
+
     # Create the model dynamically
     return create_model(model_name, **fields)
 
@@ -53,7 +62,7 @@ def generate_pydantic_model_from_callable(func: Callable) -> BaseModel:
 step_map = get_all_step_classes_and_functions()
 
 
-class Step(BaseModel):
+class TransformStep(BaseModel):
     step: str = Field(..., description="The function name in the ETL library")
     args: Dict[str, Any] = Field(..., description="Arguments to pass to the function")
 
@@ -65,17 +74,4 @@ class Step(BaseModel):
         fn_or_class = step_map[step_name]
         model = generate_pydantic_model_from_callable(fn_or_class)
         model(**v)  # Will raise if invalid
-        return v
-
-
-class EtlDagConfig(BaseModel):
-    account: str = Field(..., description="The beancount account to use")
-    glob_pattern: str = Field(..., description="The glob pattern to match input files")
-    processed_uri: str = Field(..., description="The URI to store processed data")
-    steps: List[Step] = Field(..., description="The list of steps to run")
-    
-    @field_validator("account")
-    def account_beancount_like(cls, v):
-        if not is_valid(v):
-            raise ValueError("Account must be a valid beancount account string")
         return v
