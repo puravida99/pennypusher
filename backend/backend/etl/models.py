@@ -3,9 +3,8 @@
 from beancount.core.account import is_valid
 import inspect
 import importlib
-from pydantic import BaseModel, create_model, validator
-import re
-from typing import Dict, get_type_hints, List
+from pydantic import BaseModel, create_model, Field, field_validator, ValidationInfo
+from typing import Any, Callable, Dict, get_type_hints, List
 
 # Dynamically import your step modules
 modules = {
@@ -24,26 +23,43 @@ def get_all_step_classes_and_functions():
                     step_map[name] = obj.__init__
     return step_map
 
-def generate_pydantic_model_from_callable(fn_or_class):
-    sig = inspect.signature(fn_or_class)
-    hints = get_type_hints(fn_or_class)
-    fields = {
-        (param if param != 'in_' else 'in'): (hints[param], ...)
-        for param in sig.parameters
-        if param != 'self'
-    }
-    return create_model(f'{fn_or_class.__name__}Args', **fields)
+def generate_pydantic_model_from_callable(func: Callable) -> BaseModel:
+    """
+    Dynamically generate a Pydantic v2 model from a function signature and type hints
+
+    Args:
+        func (Callable): The function to generate the model from
+
+    Returns:
+        The generated Pydantic model
+    """
+    sig = inspect.signature(func)
+    type_hints = get_type_hints(func)
+    model_name = f"{func.__name__.capitalize()}Args"
+
+    # Gather fields
+    fields: Dict[str, tuple] = {}
+    for name, param in sig.parameters.items():
+        if name == "self":
+            continue
+        annotation = type_hints.get(name, Any)
+        default = param.default if param.default is not inspect.Parameter.empty else ...
+        fields[name] = (annotation, Field(default))
+    
+    # Create the model dynamically
+    return create_model(model_name, **fields)
 
 
 step_map = get_all_step_classes_and_functions()
 
-class Step(BaseModel):
-    step: str
-    args: Dict[str, str]
 
-    @validator("args")
-    def validate_args(cls, v, values):
-        step_name = values["step"]
+class Step(BaseModel):
+    step: str = Field(..., description="The function name in the ETL library")
+    args: Dict[str, Any] = Field(..., description="Arguments to pass to the function")
+
+    @field_validator("args")
+    def validate_args(cls, v: Dict, info: ValidationInfo):
+        step_name = info.data["step"]
         if step_name not in step_map:
             raise ValueError(f"Unknown step: {step_name}")
         fn_or_class = step_map[step_name]
@@ -53,46 +69,13 @@ class Step(BaseModel):
 
 
 class EtlDagConfig(BaseModel):
-    account: str
-    glob_pattern: str
-    processed_uri: str
-    steps: List[Step]
+    account: str = Field(..., description="The beancount account to use")
+    glob_pattern: str = Field(..., description="The glob pattern to match input files")
+    processed_uri: str = Field(..., description="The URI to store processed data")
+    steps: List[Step] = Field(..., description="The list of steps to run")
     
-    @validator("account")
+    @field_validator("account")
     def account_beancount_like(cls, v):
         if not is_valid(v):
             raise ValueError("Account must be a valid beancount account string")
         return v
-
-    @validator("steps")
-    def validate_steps(cls, values):
-        steps = values.get("steps")
-        if not steps or not isinstance(steps, list):
-            raise ValueError("EtlDagConfig must have a list of steps")
-        return values
-
-# class TransformStepConfig(BaseModel):
-#     step: str = Field(..., description="The function name in the ETL library")
-#     args: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Arguments to pass to the function")
-#     enabled: bool = Field(default=True, description="Whether to run this step")
-#     description: Optional[str] = Field(None, description="Optional description of what this step does")
-
-#     @root_validator
-#     def validate_step(cls, values):
-#         if not values.get("step"):
-#             raise ValueError("Each step must define a 'step' name")
-#         return values
-
-
-# class TransformDAGConfig(BaseModel):
-#     source_file: str = Field(..., description="Path to input file, e.g., CSV or PDF")
-#     output_path: Optional[str] = Field(None, description="Where to write final output (optional)")
-#     dag_name: Optional[str] = Field(None, description="Custom name for the DAG (optional)")
-#     steps: List[TransformStepConfig] = Field(..., description="List of transformation steps")
-
-#     @root_validator
-#     def validate_steps(cls, values):
-#         steps = values.get("steps")
-#         if not steps or not isinstance(steps, list):
-#             raise ValueError("DAGConfig must have a list of steps")
-#         return values
