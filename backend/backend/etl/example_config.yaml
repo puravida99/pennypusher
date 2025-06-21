@@ -1,42 +1,54 @@
-account: "Liabilities:US:Chase:0001"
-glob_pattern: ~/some/directory/data/chase/*.csv
 processed_uri: ~/some/transaction/db
 
-steps:
-    # Read the csv data
-    - step: ParseCsv
-      args:
-        file_path: "{{path}}"
+# Extraction step of the ETL pipeline
+extract:
+  type: csv
+  args:
+    glob_pattern: ~/some/directory/data/chase/*.csv
+    csv_options:
+      sep: ","
 
-    # Generate a currency column
-    - step: InferCurrency
+# List of transformations to apply
+transforms:
+    # Add the account column
+    - step: AddColumn
       args:
-        amount_col: "amount"
-        outcol: "currency"
+        literal: Liabilities:US:Chase:0001
+        outcol: amount
+  
+    # Generate a currency column
+    - step: AddColumn
+      args:
+        literal: USD
+        outcol: cost_currency
 
     # Remove non-alphanumeric characters from the narrations
     - step: StringCleaner
       args:
-        col: "Description"
-        outcol: "narration"
+        col: Description
+        outcol: narration
         regex: "[^a-zA-Z0-9 ]"
-        replacement: ""
+        replacement: 
 
-    # Convert dates to UTC
-    - step: StandardizeDates
+    # Convert dates to datetime object
+    - step: DatetimeTransform
       args:
-        col: "Transaction Date"
-        outcol: "date"
-        infmt: "%Y-%m-%d"
-        outfmt: "%Y-%m-%dT%H:%M:%S.%fZ"
+        col: Transaction Date
+        outcol: transaction_date
+        fmt: "%m/%d/%Y"
+    - step: DatetimeTransform
+      args:
+        col: Post Date
+        outcol: posting_date
+        fmt: "%m/%d/%Y"
 
-    # Rename columns
+    # Rename columns to fit the schema
     - step: RenameCol
       args:
-        in: "Posting Date"
-        out: "PostingDate"
+        in: Category
+        out: category
     - step: RenameCol
       args:
-        in: "Posting Date"
-        out: "PostingDate"
-    
+        in: Amount
+        out: cost_amount
+
