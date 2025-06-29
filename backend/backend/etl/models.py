@@ -1,5 +1,6 @@
 """ """
 
+from beancount.core.account import is_valid
 import inspect
 import importlib
 from pydantic import BaseModel, create_model, Field, field_validator, ValidationInfo
@@ -75,3 +76,26 @@ class TransformStep(BaseModel):
         model = generate_pydantic_model_from_callable(fn_or_class)
         model(**v)  # Will raise if invalid
         return v
+
+
+class ExtractDagConfig(BaseModel):
+    type: str = Field(..., description="The type of data to extract")
+    glob_pattern: str = Field(..., description="The glob pattern to match input files")
+    args: Dict[str, Any] = Field(..., description="Arguments to pass to the function")
+
+
+class TransformDagConfig(BaseModel):
+    name: str = Field(..., description="The name of the DAG")
+    steps: List[TransformStep] = Field(..., description="The list of steps to run")
+
+
+class LoadDagConfig(BaseModel):
+    type: str = Field(..., description="The type of data to load")
+    uri: str = Field(..., description="The URI to store processed data")
+    args: Dict[str, Any] = Field(..., description="Arguments to pass to the function")
+
+
+class EtlDagConfig(BaseModel):
+    extract: ExtractDagConfig = Field(..., description="The beancount account to use")
+    transforms: TransformDagConfig = Field(..., description="The glob pattern to match input files")
+    load: LoadDagConfig = Field(..., description="The URI to store processed data")

@@ -13,6 +13,44 @@ class Transform(abc.ABC):
         raise NotImplementedError
 
 
+class AddColumn(Transform):
+    """
+    Creates a column from a literal (string or number)
+    """
+
+    def __init__(self, literal: Union[str, int, float], outcol: str):
+        super.__init__()
+        self.literal = literal
+        self.outcol = outcol
+
+    def apply(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        return lf.with_column(pl.lit(self.literal).alias(self.outcol))
+
+
+class CreditDebitToAmount(Transform):
+    """
+    Collapes credit and debit columns into a single column with a signed amount
+    representing the change in balance for the given entry.
+    """
+
+    def __init__(self, credit_col: str, debit_col: str, outcol: str):
+        """
+        Args:
+            credit_col (str): The column containing the credit amount.
+            debit_col (str): The column containing the debit amount.
+            outcol (str): The column to store the amount.
+        """
+        super().__init__()
+        self.credit_col = credit_col
+        self.debit_col = debit_col
+        self.outcol = outcol
+
+    def apply(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        return lf.with_column(
+            (pl.col(self.credit_col) - pl.col(self.debit_col)).alias(self.outcol)
+        )
+
+
 class DatetimeTransform(Transform):
     """ """
 
@@ -26,49 +64,6 @@ class DatetimeTransform(Transform):
         return lf.with_column(
             pl.col(self.col).str.strptime(pl.Datetime, self.fmt).alias(self.outcol)
         )
-
-
-class StringCleaner(Transform):
-    """
-    Replaces all occurrences of a regex pattern in a string column.
-    """
-
-    def __init__(
-        self, col: str, outcol: str, regex: str, replacement: Optional[str] = ""
-    ):
-        """
-        Args:
-            col (str): The column to clean.
-            outcol (str): The column to store the cleaned string.
-            regex (str): The regex pattern to replace.
-            replacement (str, optional): The replacement string. Defaults to empty.
-        """
-        super().__init__()
-        self.col = col
-        self.outcol = outcol
-        self.regex = regex
-        self.replacement = replacement
-
-    def apply(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        return lf.with_column(
-            pl.col(self.col)
-            .str.replace_all(self.regex, self.replacement)
-            .alias(self.outcol)
-        )
-
-
-class AddColumn(Transform):
-    """
-    Creates a column from a literal (string or number)
-    """
-
-    def __init__(self, literal: Union[str, int, float], outcol: str):
-        super.__init__()
-        self.literal = literal
-        self.outcol = outcol
-
-    def apply(self, lf: pl.LazyFrame) -> pl.LazyFrame:
-        return lf.with_column(pl.lit(self.literal).alias(self.outcol))
 
 
 class InferCurrency(Transform):
@@ -123,25 +118,44 @@ class InferCurrency(Transform):
         return lf.drop(self.tmp_col)
 
 
-class CreditDebitToAmount(Transform):
+class RenameCol(Transform):
     """
-    Collapes credit and debit columns into a single column with a signed amount
-    representing the change in balance for the given entry.
+    Renames a column.
     """
-
-    def __init__(self, credit_col: str, debit_col: str, outcol: str):
-        """
-        Args:
-            credit_col (str): The column containing the credit amount.
-            debit_col (str): The column containing the debit amount.
-            outcol (str): The column to store the amount.
-        """
+    
+    def __init__(self, col: str, outcol: str):
         super().__init__()
-        self.credit_col = credit_col
-        self.debit_col = debit_col
+        self.col = col
         self.outcol = outcol
 
     def apply(self, lf: pl.LazyFrame) -> pl.LazyFrame:
+        return lf.with_column(pl.col(self.col).alias(self.outcol))
+
+
+class StringCleaner(Transform):
+    """
+    Replaces all occurrences of a regex pattern in a string column.
+    """
+
+    def __init__(
+        self, col: str, outcol: str, regex: str, replacement: Optional[str] = ""
+    ):
+        """
+        Args:
+            col (str): The column to clean.
+            outcol (str): The column to store the cleaned string.
+            regex (str): The regex pattern to replace.
+            replacement (str, optional): The replacement string. Defaults to empty.
+        """
+        super().__init__()
+        self.col = col
+        self.outcol = outcol
+        self.regex = regex
+        self.replacement = replacement
+
+    def apply(self, lf: pl.LazyFrame) -> pl.LazyFrame:
         return lf.with_column(
-            (pl.col(self.credit_col) - pl.col(self.debit_col)).alias(self.outcol)
+            pl.col(self.col)
+            .str.replace_all(self.regex, self.replacement)
+            .alias(self.outcol)
         )

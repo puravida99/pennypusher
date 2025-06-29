@@ -3,8 +3,8 @@ processed_uri: ~/some/transaction/db
 # Extraction step of the ETL pipeline
 extract:
   type: csv
+  glob_pattern: ~/some/directory/data/chase/*.csv
   args:
-    glob_pattern: ~/some/directory/data/chase/*.csv
     csv_options:
       sep: ","
 
@@ -23,12 +23,11 @@ transforms:
         outcol: cost_currency
 
     # Remove non-alphanumeric characters from the narrations
-    - step: StringCleaner
-      args:
-        col: Description
-        outcol: narration
-        regex: "[^a-zA-Z0-9 ]"
-        replacement: 
+    # - step: StringCleaner
+    #   args:
+    #     col: Description
+    #     outcol: narration
+    #     regex: "[^a-zA-Z0-9 ]"
 
     # Convert dates to datetime object
     - step: DatetimeTransform
@@ -52,3 +51,8 @@ transforms:
         in: Amount
         out: cost_amount
 
+# Where to store the transformed data
+load:
+  type: parquet
+  args:
+    uri: ~/some/transaction/db
